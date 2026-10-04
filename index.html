@@ -14,9 +14,11 @@
   .copy{background:#fff;color:#1F3864;border:2px solid #1F3864}
   .paid{background:#2e7d32}
   .small{font-size:13px;color:#555}
+  .steps{border:2px solid #1F3864;border-radius:12px;padding:14px;margin:16px 0;text-align:left}
+  .steps ol{margin:8px 0 0;padding-left:20px;font-size:15px;line-height:1.6}
+  .num{font-size:24px;font-weight:bold;text-align:center;letter-spacing:1px;margin:8px 0}
   input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #bbb;border-radius:8px;font-size:15px;margin:6px 0}
   hr{border:0;border-top:1px solid #ddd;margin:22px 0}
-  .hide{display:none}
 </style>
 </head>
 <body>
@@ -65,21 +67,40 @@ function render(d) {
   var any = "upi://pay?" + qs;
   var onPhone = isAndroid || isIOS;
 
+  var limit = Number(d.limit) || 2000;
+  var hasMobile = !!d.mobile;
+  // App links are blocked by the payment apps for large amounts, so only offer them for small ones.
+  var showButtons = onPhone && (!hasMobile || Number(d.amount) <= limit);
+
+  var steps = hasMobile ?
+    '<div class="steps"><b>Pay by mobile number</b><ol>' +
+    '<li>Open GPay / PhonePe / Paytm</li>' +
+    '<li>Tap <b>Pay phone number</b></li>' +
+    '<li>Enter this number:<div class="num" id="mob">' + esc(d.mobile) + '</div></li>' +
+    '<li>Amount <b>&#8377;' + inr(d.amount) + '</b>, note: <b>Room ' + esc(d.room) + '</b></li></ol>' +
+    '<button class="btn copy" onclick="copyText(\'mob\',\'Number copied.\')">Copy number</button>' +
+    '<p class="small" style="margin:0">Name shown: ' + esc(d.owner) + '</p></div>'
+    : '';
+
+  var buttons = showButtons ?
+    '<a class="btn gp" href="' + esc(gpay) + '">Pay with GPay</a>' +
+    '<a class="btn pp" href="' + esc(phonepe) + '">Pay with PhonePe</a>' +
+    '<a class="btn pt" href="' + esc(paytm) + '">Pay with Paytm</a>' +
+    '<a class="btn any" href="' + esc(any) + '">Other UPI app</a>'
+    : '';
+
+  var upiBlock = hasMobile ? '' :
+    '<p class="small">App shows a payment limit message? Copy the UPI ID below, then in your app choose <b>Pay to UPI ID</b> and enter <b>&#8377;' + inr(d.amount) + '</b>.</p>' +
+    '<p class="small">UPI ID<br><b id="upi">' + esc(d.upi) + '</b></p>' +
+    '<button class="btn copy" onclick="copyText(\'upi\',\'UPI ID copied.\')">Copy UPI ID</button>';
+
   show(
     '<p class="pg">' + esc(d.pg) + '</p>' +
     '<h2>Hi ' + esc(d.name) + '</h2>' +
     '<p>Rent for <b>' + esc(d.month) + '</b> (Room ' + esc(d.room) + ')</p>' +
     '<div class="amt">&#8377;' + inr(d.amount) + '</div>' +
     '<p class="small">Due ' + esc(d.due) + '</p>' +
-    (onPhone ?
-      '<a class="btn gp" href="' + esc(gpay) + '">Pay with GPay</a>' +
-      '<a class="btn pp" href="' + esc(phonepe) + '">Pay with PhonePe</a>' +
-      '<a class="btn pt" href="' + esc(paytm) + '">Pay with Paytm</a>' +
-      '<a class="btn any" href="' + esc(any) + '">Other UPI app</a>'
-    : '<p class="small"><b>Open this link on your phone</b> to pay with GPay, PhonePe or Paytm.</p>') +
-    '<p class="small">App shows a payment limit message? Copy the UPI ID below, then in your app choose <b>Pay to UPI ID</b> and enter <b>&#8377;' + inr(d.amount) + '</b>.</p>' +
-    '<p class="small">UPI ID<br><b id="upi">' + esc(d.upi) + '</b></p>' +
-    '<button class="btn copy" onclick="copyUpi()">Copy UPI ID</button>' +
+    steps + buttons + upiBlock +
     '<hr><p><b>Already paid?</b></p>' +
     '<input id="ref" placeholder="UTR / reference no. (optional)" maxlength="40">' +
     '<button class="btn paid" id="cl" onclick="claim()">I have paid</button>' +
@@ -87,9 +108,17 @@ function render(d) {
   );
 }
 
-function copyUpi() {
-  var t = document.getElementById("upi").innerText;
-  if (navigator.clipboard) navigator.clipboard.writeText(t).then(function(){document.getElementById("msg").innerText="UPI ID copied.";});
+function copyText(id, okMsg) {
+  var t = document.getElementById(id).innerText;
+  var m = document.getElementById("msg");
+  function fallback() {
+    var r = document.createRange(); r.selectNodeContents(document.getElementById(id));
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    m.innerText = "Selected. Long-press and tap Copy.";
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(function(){ m.innerText = okMsg; }, fallback);
+  } else { fallback(); }
 }
 
 function claim() {
