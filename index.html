@@ -96,9 +96,18 @@ function claim() {
   var b = document.getElementById("cl"), m = document.getElementById("msg");
   b.disabled = true; m.innerText = "Saving...";
   fetch(APPS_URL + "?claim=1&t=" + encodeURIComponent(token) + "&ref=" + encodeURIComponent(document.getElementById("ref").value))
-    .then(function(r){return r.json();})
-    .then(function(r){ m.innerText = (r.result === "ok") ? "Thanks! Your owner has been notified and will confirm." : (r.result || "Could not save."); })
-    .catch(function(){ b.disabled = false; m.innerText = "Could not save. Please try again."; });
+    .then(function(r){return r.text();})
+    .then(function(t){
+      var r;
+      try { r = JSON.parse(t); } catch (e) {
+        b.disabled = false;
+        m.innerText = "Server returned an error page. Owner: redeploy the Web App as a New version and run Rent Bot > 9. Authorize all permissions.";
+        return;
+      }
+      if (r.result === "ok") { m.innerText = "Thanks! Your owner has been notified and will confirm."; }
+      else { b.disabled = false; m.innerText = r.result || "Could not save."; }
+    })
+    .catch(function(){ b.disabled = false; m.innerText = "Could not reach the server. Please check your internet and try again."; });
 }
 </script>
 </body>
